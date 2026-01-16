@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  # 1. The Core Application (Agent Runtime)
+  clink-runtime:
+    build: .
+    container_name: clink_core_runtime
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./src:/app/src  # Mount source code for hot-reloading
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - ENV=development
+    depends_on:
+      - redis
+    command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # 2. State Store (Persistence Layer)
+  redis:
+    image: redis:7-alpine
+    container_name: clink_redis_state_store
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # 3. Cloud Emulator (AWS Simulation)
+  localstack:
+    image: localstack/localstack
+    container_name: clink_cloud_emulator
+    ports:
+      - "4566:4566"            # AWS API Gateway port
+    environment:
+      - SERVICES=lambda,s3     # Enable only required services
+      - DEBUG=1
+    volumes:
+      - "./localstack_data:/var/lib/localstack"
+
+volumes:
+  redis_data:
+  localstack_data:
