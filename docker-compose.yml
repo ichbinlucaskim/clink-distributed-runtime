@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # 1. The Core Application (Agent Runtime)
   clink-runtime:
@@ -8,23 +6,28 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./src:/app/src  # Mount source code for hot-reloading
+      - .:/app
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - ENV=development
+      - PYTHONPATH=/app
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - IS_DOCKER=1
     depends_on:
       - redis
-    command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
+    command: python -m uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
 
   # 2. State Store (Persistence Layer)
+  # Using redis-stack-server for JSON module support (required by LangGraph checkpointer)
   redis:
-    image: redis:7-alpine
+    image: redis/redis-stack-server:latest
     container_name: clink_redis_state_store
     ports:
       - "6379:6379"
     volumes:
-      - redis_data:/data
+      - redis_data:/data  # Persists through container kills
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
